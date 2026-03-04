@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #0c1929;
+  --color-primary-100: #0f2440;
+  --color-primary-200: #1a3a5c;
+  --color-primary-300: #2563eb;
+  --color-primary-400: #3b82f6;
+  --color-primary-500: #06b6d4;
+  --color-primary-600: #22d3ee;
+  --color-primary-700: #67e8f9;
+  --color-primary-800: #a5f3fc;
+  --color-primary-900: #cffafe;
+
+  --color-accent-50: #042f2e;
+  --color-accent-500: #10b981;
+  --color-accent-600: #34d399;
+
+  --color-surface: #111827;
+  --color-surface-secondary: #0d1424;
+  --color-surface-panel: rgba(22, 35, 60, 0.75);
+  --color-surface-card: rgba(22, 38, 68, 0.65);
+  --color-surface-hover: rgba(40, 58, 100, 0.55);
+
+  --color-neon-cyan: #06b6d4;
+  --color-neon-blue: #3b82f6;
+  --color-neon-purple: #8b5cf6;
+  --color-neon-green: #10b981;
+  --color-neon-pink: #ec4899;
+  --color-neon-orange: #f97316;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: local('JetBrains Mono');
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--color-surface-secondary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #cbd5e1;
+}
+
+.glass {
+  background: var(--color-surface-panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(6, 182, 212, 0.18);
+}
+
+.glass-strong {
+  background: rgba(22, 35, 60, 0.9);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(6, 182, 212, 0.18);
+}
+
+.glow-border {
+  box-shadow:
+    0 0 0 1px rgba(6, 182, 212, 0.18),
+    0 0 20px -3px rgba(6, 182, 212, 0.15),
+    0 0 40px -6px rgba(6, 182, 212, 0.08);
+}
+
+.glow-border-strong {
+  box-shadow:
+    0 0 0 1px rgba(6, 182, 212, 0.35),
+    0 0 25px -3px rgba(6, 182, 212, 0.25),
+    0 0 50px -6px rgba(6, 182, 212, 0.12);
+}
+
+.glow-text {
+  text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+.neon-btn {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.9), rgba(59, 130, 246, 0.9));
+  box-shadow:
+    0 0 20px -5px rgba(6, 182, 212, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+.neon-btn:hover:not(:disabled) {
+  box-shadow:
+    0 0 30px -5px rgba(6, 182, 212, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+.neon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.scanline {
+  position: relative;
+  overflow: hidden;
+}
+.scanline::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.3), transparent);
+  animation: scanline 3s linear infinite;
+}
+
+@keyframes scanline {
+  0% { top: 0; }
+  100% { top: 100%; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes taskFlash {
+  0%   { background-color: transparent; }
+  20%  { background-color: rgba(6, 182, 212, 0.12); box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.25); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+
+.task-flash {
+  animation: taskFlash 1.2s ease forwards !important;
+}
+
+@keyframes taskScan {
+  0%, 100% { background-color: transparent; }
+  50%       { background-color: rgba(6, 182, 212, 0.06); }
+}
+
+.task-scanning {
+  animation: taskScan 1.4s ease-in-out infinite !important;
+  border-left: 2px solid rgba(6, 182, 212, 0.4) !important;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(6, 182, 212, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.6); }
+}
+
+@keyframes border-glow {
+  0%, 100% { border-color: rgba(6, 182, 212, 0.2); }
+  50% { border-color: rgba(6, 182, 212, 0.5); }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(22, 35, 60, 0.4);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(6, 182, 212, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.4);
+}
+
+select option {
+  background-color: #1a2744;
+  color: #cbd5e1;
+}

@@ -1,0 +1,25 @@
+{
+  "members": [
+    {
+      "role": "architect",
+      "skills": ["system_design", "architecture", "technical_planning"],
+      "max_hours_per_week": 40
+    },
+    {
+      "role": "developer",
+      "skills": ["python", "javascript", "react", "backend", "frontend"],
+      "max_hours_per_week": 40
+    },
+    {
+      "role": "qa",
+      "skills": ["testing", "automation", "quality_assurance"],
+      "max_hours_per_week": 40
+    },
+    {
+      "role": "devops",
+      "skills": ["ci_cd", "docker", "cloud", "infrastructure"],
+      "max_hours_per_week": 32
+    }
+  ],
+  "max_adjustment_iterations": 3
+}
