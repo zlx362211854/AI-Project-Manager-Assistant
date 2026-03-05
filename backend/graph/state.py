@@ -8,6 +8,7 @@ from ..models.team import TeamConfig
 class GraphState(TypedDict, total=False):
     """State object that flows through the LangGraph workflow."""
     raw_input: str
+    enriched_input: str
     requirement: Optional[Requirement]
     subtasks: list[SubTask]
     team_config: TeamConfig
@@ -17,3 +18,8 @@ class GraphState(TypedDict, total=False):
     output_format: str
     final_output: str
     error: Optional[str]
+    clarification_questions: list[dict]
+    clarification_answers: dict[str, str | list[str]]
+    clarification_phase: str
+    clarification_context: str
+    needs_clarification: bool

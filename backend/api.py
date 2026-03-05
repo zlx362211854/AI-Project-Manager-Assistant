@@ -20,8 +20,10 @@ from pydantic import BaseModel, Field
 
 from .config.settings import load_team_config, get_settings
 from .graph.workflow import build_workflow
+from .graph import run_workflow_with_interrupt
 from .utils.stream import StreamEmitter
 from .graph.streaming import run_streaming_workflow, run_extend_workflow
+from langgraph.errors import NodeInterrupt
 from .models.task import Requirement, TaskType, SubTask, Priority
 
 logger = logging.getLogger(__name__)
@@ -216,15 +218,65 @@ async def _generate_sse_async(
     emitter.on_connect()
     yield _make_sse_event("session", {"session_id": session_id})
 
-    thread = threading.Thread(
-        target=run_streaming_workflow,
-        args=(requirement, output_format, team_config,
-              settings.max_adjustments, emitter, language, collect_technical),
-        daemon=True,
-    )
-    thread.start()
+    lang_suffix = _lang_instruction(language)
+    initial_state = create_initial_state(requirement, output_format)
+    initial_state["max_adjustments"] = settings.max_adjustments
+    initial_state["clarification_answers"] = {}
+    initial_state["needs_clarification"] = False
+
+    pending_resume = {"answers": None}
+
+    def run_langgraph_workflow():
+        try:
+            result, interrupt_data = run_workflow_with_interrupt(
+                initial_state,
+                session_id,
+                pending_resume["answers"]
+            )
+            if interrupt_data:
+                emitter.clarification(interrupt_data)
+                return "interrupted"
+            return result
+        except Exception as e:
+            logger.error("Workflow error: %s", e)
+            emitter.error(str(e))
+            return None
+
+    def check_for_answer():
+        while True:
+            time.sleep(0.5)
+            with _sessions_lock:
+                emitter_obj = _sessions.get(session_id)
+            if emitter_obj and hasattr(emitter_obj, '_pending_answers'):
+                answers = emitter_obj._pending_answers
+                if answers is not None:
+                    pending_resume["answers"] = {
+                        "clarification_answers": answers}
+                    emitter_obj._pending_answers = None
+                    return True
+            if emitter.is_cancelled:
+                return False
+        return False
+
+    workflow_thread = threading.Thread(
+        target=run_langgraph_workflow, daemon=True)
+    workflow_thread.start()
 
     try:
+        while workflow_thread.is_alive():
+            await asyncio.sleep(0.1)
+            with _sessions_lock:
+                emitter_obj = _sessions.get(session_id)
+            if emitter_obj and hasattr(emitter_obj, '_pending_answers'):
+                answers = emitter_obj._pending_answers
+                if answers is not None:
+                    pending_resume["answers"] = {
+                        "clarification_answers": answers}
+                    emitter_obj._pending_answers = None
+                    workflow_thread = threading.Thread(
+                        target=run_langgraph_workflow, daemon=True)
+                    workflow_thread.start()
+
         async for chunk in _stream_events_async(emitter):
             yield chunk
     finally:
