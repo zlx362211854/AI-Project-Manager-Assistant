@@ -133,10 +133,7 @@ AI-project-manager/
 │   ├── models/
 │   │   ├── task.py             # Task/SubTask/Requirement models
 │   │   └── team.py             # TeamMember/TeamConfig models
-│   ├── utils/
-│   │   └── output_formatter.py # File output utilities
 │   ├── api.py                  # FastAPI REST server
-│   ├── main.py                 # CLI entry point
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/

@@ -15,11 +15,11 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from sse_starlette import EventSourceResponse
 from pydantic import BaseModel, Field
 
 from .config.settings import load_team_config, get_settings
-from .main import run_workflow, create_initial_state
+from .graph.workflow import build_workflow
 from .utils.stream import StreamEmitter
 from .graph.streaming import run_streaming_workflow, run_extend_workflow
 from .models.task import Requirement, TaskType, SubTask, Priority
@@ -44,6 +44,46 @@ _sessions: dict[str, StreamEmitter] = {}
 _sessions_lock = threading.Lock()
 
 
+def create_initial_state(
+    requirement_text: str,
+    output_format: str = "markdown",
+    team_config_path: str | None = None,
+) -> dict:
+    """Build the initial state dict for the LangGraph workflow."""
+    settings = get_settings()
+    team_config = load_team_config(team_config_path)
+
+    return {
+        "raw_input": requirement_text,
+        "requirement": None,
+        "subtasks": [],
+        "team_config": team_config,
+        "has_conflict": False,
+        "adjustment_count": 0,
+        "max_adjustments": settings.max_adjustments,
+        "output_format": output_format,
+        "final_output": "",
+        "error": None,
+    }
+
+
+def run_workflow(
+    requirement_text: str,
+    output_format: str = "markdown",
+    team_config_path: str | None = None,
+) -> str:
+    """Execute the full AI project manager workflow."""
+    initial_state = create_initial_state(
+        requirement_text, output_format, team_config_path)
+    workflow = build_workflow()
+    result = workflow.invoke(initial_state)
+
+    if result.get("error"):
+        raise RuntimeError(f"Workflow failed: {result['error']}")
+
+    return result.get("final_output", "")
+
+
 def _cleanup_sessions() -> None:
     """
     Background thread: periodically remove expired sessions.
@@ -59,15 +99,20 @@ def _cleanup_sessions() -> None:
                 logger.debug("Cleaned up expired session %s", sid)
 
 
-threading.Thread(target=_cleanup_sessions, daemon=True, name="session-cleanup").start()
+threading.Thread(target=_cleanup_sessions, daemon=True,
+                 name="session-cleanup").start()
 
 
 class RequirementRequest(BaseModel):
     """Request body for processing a requirement."""
-    requirement: str = Field(..., description="Natural language requirement text")
-    output_format: str = Field(default="json", description="Output format: json or markdown")
-    language: str = Field(default="en", description="Output language: en or zh")
-    collect_technical: bool = Field(default=False, description="Whether to collect technical implementation details during clarification")
+    requirement: str = Field(...,
+                             description="Natural language requirement text")
+    output_format: str = Field(
+        default="json", description="Output format: json or markdown")
+    language: str = Field(
+        default="en", description="Output language: en or zh")
+    collect_technical: bool = Field(
+        default=False, description="Whether to collect technical implementation details during clarification")
 
 
 class RequirementResponse(BaseModel):
@@ -92,34 +137,26 @@ class ClarifyRequest(BaseModel):
 
 class ExtendRequest(BaseModel):
     """Request body for extending an existing task plan with a new requirement."""
-    new_requirement: str = Field(..., description="Additional requirement to add to the existing plan")
-    existing_result: dict = Field(..., description="The current ProcessResult JSON (requirement + subtasks + …)")
-    language: str = Field(default="en", description="Output language: en or zh")
+    new_requirement: str = Field(
+        ..., description="Additional requirement to add to the existing plan")
+    existing_result: dict = Field(
+        ..., description="The current ProcessResult JSON (requirement + subtasks + …)")
+    language: str = Field(
+        default="en", description="Output language: en or zh")
 
 
-def _sse_event(event: str, data: dict | str) -> str:
-    """
-    Format a Server-Sent Event string.
-
-    @param event: Event type name
-    @param data: Event payload (dict will be JSON-serialized)
-    @returns: Formatted SSE string
-    """
-    payload = json.dumps(data) if isinstance(data, dict) else json.dumps({"content": data})
-    return f"event: {event}\ndata: {payload}\n\n"
+def _make_sse_event(event: str, data: dict | str) -> dict:
+    """Format a Server-Sent Event dict for sse-starlette."""
+    payload = data if isinstance(data, dict) else {"content": data}
+    return {"event": event, "data": payload}
 
 
-async def _stream_events_async(emitter: StreamEmitter) -> AsyncGenerator[str, None]:
+async def _stream_events_async(emitter: StreamEmitter):
     """
     Async SSE event consumer: reads from the emitter queue WITHOUT blocking
     the uvicorn event loop.
 
-    queue.Queue.get() is run in the default threadpool via run_in_executor so
-    the event loop remains free to serve other requests (e.g. /api/health,
-    /api/process/clarify) while the LLM is producing tokens.
-
-    @param emitter: Active StreamEmitter
-    @yields: SSE-formatted event strings
+    Yields dicts that sse-starlette will serialize automatically.
     """
     loop = asyncio.get_event_loop()
     while True:
@@ -128,29 +165,28 @@ async def _stream_events_async(emitter: StreamEmitter) -> AsyncGenerator[str, No
                 None, lambda: emitter.get(timeout=30)
             )
         except Exception:
-            # Queue timeout — keepalive comment keeps the TCP connection alive.
-            yield ": keepalive\n\n"
+            yield {"event": "keepalive", "data": {}}
             continue
 
         if event_type == "done":
-            yield _sse_event("done", {})
+            yield {"event": "done", "data": {}}
             break
         elif event_type == "error":
-            yield _sse_event("error", {"message": data})
-            yield _sse_event("done", {})
+            yield {"event": "error", "data": {"message": data}}
+            yield {"event": "done", "data": {}}
             break
         elif event_type == "text":
-            yield _sse_event("text", {"content": data})
+            yield {"event": "text", "data": {"content": data}}
         elif event_type == "step":
-            yield _sse_event("step", data)
+            yield {"event": "step", "data": data}
         elif event_type == "tasks_update":
-            yield _sse_event("tasks_update", {"tasks": data})
+            yield {"event": "tasks_update", "data": {"tasks": data}}
         elif event_type == "result":
-            yield _sse_event("result", data)
+            yield {"event": "result", "data": data}
         elif event_type == "task_processing":
-            yield _sse_event("task_processing", data)
+            yield {"event": "task_processing", "data": data}
         elif event_type == "clarification":
-            yield _sse_event("clarification", data)
+            yield {"event": "clarification", "data": data}
 
 
 async def _generate_sse_async(
@@ -178,11 +214,12 @@ async def _generate_sse_async(
         _sessions[session_id] = emitter
 
     emitter.on_connect()
-    yield _sse_event("session", {"session_id": session_id})
+    yield _make_sse_event("session", {"session_id": session_id})
 
     thread = threading.Thread(
         target=run_streaming_workflow,
-        args=(requirement, output_format, team_config, settings.max_adjustments, emitter, language, collect_technical),
+        args=(requirement, output_format, team_config,
+              settings.max_adjustments, emitter, language, collect_technical),
         daemon=True,
     )
     thread.start()
@@ -242,16 +279,11 @@ async def process_requirement_stream(request: RequirementRequest):
       - done: {}                         -- stream complete
 
     @param request: RequirementRequest
-    @returns: SSE StreamingResponse
+    @returns: SSE EventSourceResponse
     """
-    return StreamingResponse(
-        _generate_sse_async(request.requirement, request.output_format, request.language, request.collect_technical),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+    return EventSourceResponse(
+        _generate_sse_async(request.requirement, request.output_format,
+                            request.language, request.collect_technical),
     )
 
 
@@ -265,13 +297,14 @@ async def resume_stream(session_id: str):
     already has a session_id (e.g. after a network drop).
 
     @param session_id: Session ID received from the original /stream request
-    @returns: SSE StreamingResponse with history replay + live continuation
+    @returns: SSE EventSourceResponse with history replay + live continuation
     """
     with _sessions_lock:
         emitter = _sessions.get(session_id)
 
     if emitter is None:
-        raise HTTPException(status_code=404, detail="Session not found or expired")
+        raise HTTPException(
+            status_code=404, detail="Session not found or expired")
 
     async def _resume_generator() -> AsyncGenerator[str, None]:
         emitter.on_connect()
@@ -280,24 +313,24 @@ async def resume_stream(session_id: str):
             history = emitter.replay_history()
             for event_type, data in history:
                 if event_type == "done":
-                    yield _sse_event("done", {})
+                    yield _make_sse_event("done", {})
                     return
                 elif event_type == "error":
-                    yield _sse_event("error", {"message": data})
-                    yield _sse_event("done", {})
+                    yield _make_sse_event("error", {"message": data})
+                    yield _make_sse_event("done", {})
                     return
                 elif event_type == "text":
-                    yield _sse_event("text", {"content": data})
+                    yield _make_sse_event("text", {"content": data})
                 elif event_type == "step":
-                    yield _sse_event("step", data)
+                    yield _make_sse_event("step", data)
                 elif event_type == "tasks_update":
-                    yield _sse_event("tasks_update", {"tasks": data})
+                    yield _make_sse_event("tasks_update", {"tasks": data})
                 elif event_type == "result":
-                    yield _sse_event("result", data)
+                    yield _make_sse_event("result", data)
                 elif event_type == "task_processing":
-                    yield _sse_event("task_processing", data)
+                    yield _make_sse_event("task_processing", data)
                 elif event_type == "clarification":
-                    yield _sse_event("clarification", data)
+                    yield _make_sse_event("clarification", data)
 
             if emitter.is_finished:
                 return
@@ -308,14 +341,8 @@ async def resume_stream(session_id: str):
         finally:
             emitter.on_disconnect()
 
-    return StreamingResponse(
+    return EventSourceResponse(
         _resume_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
     )
 
 
@@ -349,7 +376,8 @@ async def submit_clarification(session_id: str, request: ClarifyRequest):
     with _sessions_lock:
         emitter = _sessions.get(session_id)
     if not emitter:
-        raise HTTPException(status_code=404, detail="Session not found or expired")
+        raise HTTPException(
+            status_code=404, detail="Session not found or expired")
 
     emitter.submit_answers(request.answers)
     return {"status": "ok", "session_id": session_id}
@@ -377,7 +405,7 @@ async def extend_requirement_stream(request: ExtendRequest):
     Uses an async generator to keep the event loop unblocked.
 
     @param request: ExtendRequest with new_requirement and existing_result
-    @returns: SSE StreamingResponse with merged task plan
+    @returns: SSE EventSourceResponse with merged task plan
     """
     existing_result = request.existing_result
     existing_subtask_dicts = existing_result.get("subtasks", [])
@@ -411,7 +439,8 @@ async def extend_requirement_stream(request: ExtendRequest):
             for t in existing_subtask_dicts
         ]
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Invalid existing_result: {e}")
+        raise HTTPException(
+            status_code=422, detail=f"Invalid existing_result: {e}")
 
     settings = get_settings()
     team_config = load_team_config()
@@ -422,7 +451,7 @@ async def extend_requirement_stream(request: ExtendRequest):
         with _sessions_lock:
             _sessions[session_id] = emitter
         emitter.on_connect()
-        yield _sse_event("session", {"session_id": session_id})
+        yield _make_sse_event("session", {"session_id": session_id})
 
         thread = threading.Thread(
             target=run_extend_workflow,
@@ -445,12 +474,6 @@ async def extend_requirement_stream(request: ExtendRequest):
         finally:
             emitter.on_disconnect()
 
-    return StreamingResponse(
+    return EventSourceResponse(
         _generate_extend_sse_async(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
     )
