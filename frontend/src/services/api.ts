@@ -17,63 +17,89 @@ async function _consumeSSE(response: Response, callbacks: StreamCallbacks): Prom
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let eventType = '';
+  let eventData = '';
+
+  const processEvent = () => {
+    if (!eventType || !eventData) return;
+    try {
+      const parsed = JSON.parse(eventData);
+      switch (eventType) {
+        case 'session':
+          callbacks.onSession(parsed.session_id || '');
+          break;
+        case 'text':
+          callbacks.onText(parsed.content || '');
+          break;
+        case 'step':
+          callbacks.onStep(parsed);
+          break;
+        case 'tasks_update':
+          callbacks.onTasksUpdate(parsed.tasks || []);
+          break;
+        case 'task_processing':
+          callbacks.onTaskProcessing(parsed.task_id || '');
+          break;
+        case 'clarification':
+          callbacks.onClarification(parsed);
+          break;
+        case 'result':
+          callbacks.onResult(parsed);
+          break;
+        case 'error':
+          callbacks.onError(parsed.message || 'Unknown error');
+          break;
+        case 'done':
+          callbacks.onDone();
+          break;
+      }
+    } catch (parseError) {
+      console.error('[SSE] JSON parse error:', parseError, 'for data:', eventData.slice(0, 500));
+    }
+    eventType = '';
+    eventData = '';
+  };
 
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        // Process any remaining data in buffer
+        if (buffer.trim()) {
+          const remainingLines = buffer.split('\n');
+          for (const line of remainingLines) {
+            if (line.startsWith('event: ')) {
+              processEvent();
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith('data: ')) {
+              eventData = line.slice(6);
+            }
+          }
+          processEvent();
+        }
+        break;
+      }
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
+      const decoded = decoder.decode(value, { stream: true });
+      buffer += decoded;
+      // Handle both \r\n (CRLF) and \n (LF) line endings
+      const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() || '';
 
-      let eventType = '';
-      let eventData = '';
-
       for (const line of lines) {
+        // Skip SSE comments (lines starting with ':')
+        if (line.startsWith(':')) {
+          continue;
+        }
         if (line.startsWith('event: ')) {
+          // New event starts - process previous event first
+          processEvent();
           eventType = line.slice(7).trim();
         } else if (line.startsWith('data: ')) {
           eventData = line.slice(6);
-        } else if (line === '' && eventType && eventData) {
-          console.log('[SSE] Received event:', eventType, 'data:', eventData.slice(0, 200));
-          try {
-            const parsed = JSON.parse(eventData);
-            switch (eventType) {
-              case 'session':
-                callbacks.onSession(parsed.session_id || '');
-                break;
-              case 'text':
-                callbacks.onText(parsed.content || '');
-                break;
-              case 'step':
-                callbacks.onStep(parsed);
-                break;
-              case 'tasks_update':
-                callbacks.onTasksUpdate(parsed.tasks || []);
-                break;
-              case 'task_processing':
-                callbacks.onTaskProcessing(parsed.task_id || '');
-                break;
-              case 'clarification':
-                callbacks.onClarification(parsed);
-                break;
-              case 'result':
-                callbacks.onResult(parsed);
-                break;
-              case 'error':
-                console.log('[SSE] Error event:', parsed.message);
-                callbacks.onError(parsed.message || 'Unknown error');
-                break;
-              case 'done':
-                callbacks.onDone();
-                break;
-            }
-          } catch {
-            // skip malformed events
-          }
-          eventType = '';
-          eventData = '';
+        } else if (line === '') {
+          // Empty line - process event
+          processEvent();
         }
       }
     }

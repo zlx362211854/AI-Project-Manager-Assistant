@@ -20,10 +20,8 @@ from pydantic import BaseModel, Field
 
 from .config.settings import load_team_config, get_settings
 from .graph.workflow import build_workflow
-from .graph import run_workflow_with_interrupt
 from .utils.stream import StreamEmitter
 from .graph.streaming import run_streaming_workflow, run_extend_workflow
-from langgraph.errors import NodeInterrupt
 from .models.task import Requirement, TaskType, SubTask, Priority
 
 logger = logging.getLogger(__name__)
@@ -148,8 +146,11 @@ class ExtendRequest(BaseModel):
 
 
 def _make_sse_event(event: str, data: dict | str) -> dict:
-    """Format a Server-Sent Event dict for sse-starlette."""
-    payload = data if isinstance(data, dict) else {"content": data}
+    """Format a Server-Sent Event dict for sse-starlette with proper JSON serialization."""
+    if isinstance(data, dict):
+        payload = json.dumps(data)
+    else:
+        payload = json.dumps({"content": data})
     return {"event": event, "data": payload}
 
 
@@ -166,29 +167,35 @@ async def _stream_events_async(emitter: StreamEmitter):
             event_type, data = await loop.run_in_executor(
                 None, lambda: emitter.get(timeout=30)
             )
-        except Exception:
-            yield {"event": "keepalive", "data": {}}
+            logger.debug("[SSE] Got event from queue: %s", event_type)
+        except Exception as e:
+            logger.debug("[SSE] Queue get timeout or error: %s", e)
+            yield {"event": "keepalive", "data": "{}"}
             continue
 
         if event_type == "done":
-            yield {"event": "done", "data": {}}
+            logger.debug("[SSE] Yielding done event")
+            yield {"event": "done", "data": "{}"}
             break
         elif event_type == "error":
-            yield {"event": "error", "data": {"message": data}}
-            yield {"event": "done", "data": {}}
+            logger.debug("[SSE] Yielding error event: %s", data)
+            yield {"event": "error", "data": json.dumps({"message": data})}
+            yield {"event": "done", "data": "{}"}
             break
         elif event_type == "text":
-            yield {"event": "text", "data": {"content": data}}
+            yield {"event": "text", "data": json.dumps({"content": data})}
         elif event_type == "step":
-            yield {"event": "step", "data": data}
+            yield {"event": "step", "data": json.dumps(data)}
         elif event_type == "tasks_update":
-            yield {"event": "tasks_update", "data": {"tasks": data}}
+            yield {"event": "tasks_update", "data": json.dumps({"tasks": data})}
         elif event_type == "result":
-            yield {"event": "result", "data": data}
+            yield {"event": "result", "data": json.dumps(data)}
         elif event_type == "task_processing":
-            yield {"event": "task_processing", "data": data}
+            yield {"event": "task_processing", "data": json.dumps(data)}
         elif event_type == "clarification":
-            yield {"event": "clarification", "data": data}
+            logger.info("[SSE] Yielding clarification event with %d questions",
+                        len(data.get("questions", [])) if isinstance(data, dict) else 0)
+            yield {"event": "clarification", "data": json.dumps(data)}
 
 
 async def _generate_sse_async(
@@ -218,65 +225,26 @@ async def _generate_sse_async(
     emitter.on_connect()
     yield _make_sse_event("session", {"session_id": session_id})
 
-    lang_suffix = _lang_instruction(language)
-    initial_state = create_initial_state(requirement, output_format)
-    initial_state["max_adjustments"] = settings.max_adjustments
-    initial_state["clarification_answers"] = {}
-    initial_state["needs_clarification"] = False
-
-    pending_resume = {"answers": None}
-
-    def run_langgraph_workflow():
+    def run_streaming():
         try:
-            result, interrupt_data = run_workflow_with_interrupt(
-                initial_state,
-                session_id,
-                pending_resume["answers"]
+            run_streaming_workflow(
+                raw_input=requirement,
+                output_format=output_format,
+                team_config=team_config,
+                max_adjustments=settings.max_adjustments,
+                emitter=emitter,
+                language=language,
+                collect_technical=collect_technical,
             )
-            if interrupt_data:
-                emitter.clarification(interrupt_data)
-                return "interrupted"
-            return result
         except Exception as e:
             logger.error("Workflow error: %s", e)
             emitter.error(str(e))
-            return None
+            emitter.done()
 
-    def check_for_answer():
-        while True:
-            time.sleep(0.5)
-            with _sessions_lock:
-                emitter_obj = _sessions.get(session_id)
-            if emitter_obj and hasattr(emitter_obj, '_pending_answers'):
-                answers = emitter_obj._pending_answers
-                if answers is not None:
-                    pending_resume["answers"] = {
-                        "clarification_answers": answers}
-                    emitter_obj._pending_answers = None
-                    return True
-            if emitter.is_cancelled:
-                return False
-        return False
-
-    workflow_thread = threading.Thread(
-        target=run_langgraph_workflow, daemon=True)
+    workflow_thread = threading.Thread(target=run_streaming, daemon=True)
     workflow_thread.start()
 
     try:
-        while workflow_thread.is_alive():
-            await asyncio.sleep(0.1)
-            with _sessions_lock:
-                emitter_obj = _sessions.get(session_id)
-            if emitter_obj and hasattr(emitter_obj, '_pending_answers'):
-                answers = emitter_obj._pending_answers
-                if answers is not None:
-                    pending_resume["answers"] = {
-                        "clarification_answers": answers}
-                    emitter_obj._pending_answers = None
-                    workflow_thread = threading.Thread(
-                        target=run_langgraph_workflow, daemon=True)
-                    workflow_thread.start()
-
         async for chunk in _stream_events_async(emitter):
             yield chunk
     finally:
