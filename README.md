@@ -112,6 +112,100 @@ npm run dev
 
 The frontend runs at `http://localhost:5173` and proxies API requests to `http://localhost:8000`.
 
+## Docker Deployment
+
+This project can be deployed on a single Vultr host with Docker Compose and a host-level nginx reverse proxy.
+
+### Container Layout
+
+- `frontend`: serves the built Vite app with nginx inside the container
+- `backend`: runs the FastAPI app with `uvicorn`
+- host nginx: listens on `80/443` and proxies this project to `127.0.0.1:18080`
+
+### Server Path
+
+Clone the repository to:
+
+```bash
+/projects/AI-Project-Manager-Assistant
+```
+
+### Server Requirements
+
+- Docker Engine
+- Docker Compose plugin
+- A server-local `.env` file in `/projects/AI-Project-Manager-Assistant/.env`
+- A GitHub deploy key on the server so `git pull` works for the repository
+
+Example install on Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin git
+```
+
+### First-Time Server Setup
+
+```bash
+mkdir -p /projects
+cd /projects
+git clone <your-repo-ssh-url> AI-Project-Manager-Assistant
+cd /projects/AI-Project-Manager-Assistant
+cp .env.example .env
+# edit .env with your production values
+docker compose up -d --build
+```
+
+The frontend container is exposed on host port `18080`. The backend is kept private inside the Compose network and is only reachable from the frontend container.
+
+### Host nginx Reverse Proxy
+
+Configure your host-level nginx to forward your public domain to `127.0.0.1:18080`:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:18080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+```
+
+### GitHub Actions Auto-Deploy
+
+On every push to `main`, GitHub Actions SSHes to the server and runs:
+
+```bash
+cd /projects/AI-Project-Manager-Assistant
+git pull --ff-only origin main
+docker compose up -d --build --remove-orphans
+```
+
+Add these GitHub repository secrets:
+
+- `VULTR_HOST`
+- `VULTR_USER`
+- `VULTR_SSH_KEY`
+- `VULTR_PORT`
+
 ## Project Structure
 
 ```
