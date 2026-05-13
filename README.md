@@ -116,6 +116,8 @@ The frontend runs at `http://localhost:5173` and proxies API requests to `http:/
 
 This project can be deployed on a single Vultr host with Docker Compose and a host-level nginx reverse proxy.
 
+The deployment flow is designed for automatic updates from GitHub Actions after pushes to `main`.
+
 ### Container Layout
 
 - `frontend`: serves the built Vite app with nginx inside the container
