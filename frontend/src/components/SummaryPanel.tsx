@@ -53,7 +53,7 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({ result }) => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-6">
+    <div className="flex flex-col md:flex-row gap-4 md:gap-6">
       <div className="shrink-0 md:max-w-xs">
         <h3 className="text-sm font-semibold text-slate-200 mb-1">
           {requirement.title}
@@ -66,23 +66,23 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({ result }) => {
         </p>
       </div>
 
-      <div className="flex gap-3 flex-wrap">
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3">
         {stats.map((stat, i) => {
           const style = STAT_STYLES[i];
           return (
             <div
               key={stat.label}
-              className={`rounded-lg bg-linear-to-br ${style.gradient} border ${style.border} px-5 py-3 text-center min-w-[90px]`}
+              className={`rounded-lg bg-linear-to-br ${style.gradient} border ${style.border} px-3 sm:px-5 py-2.5 sm:py-3 text-center sm:min-w-[90px]`}
               style={{ boxShadow: style.glow }}
             >
-              <div className={`text-lg font-bold font-mono ${style.text}`}>{stat.value}</div>
+              <div className={`text-base sm:text-lg font-bold font-mono ${style.text}`}>{stat.value}</div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wide">{stat.label}</div>
             </div>
           );
         })}
       </div>
 
-      <div className="flex-1 min-w-[200px]">
+      <div className="flex-1 md:min-w-[200px]">
         <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">{t.summary.priorityBreakdown}</h4>
         <div className="space-y-1.5">
           {(['critical', 'high', 'medium', 'low'] as Priority[]).map((level) => {

@@ -23,7 +23,7 @@ const StepProgress: React.FC<StepProgressProps> = ({ completedSteps, currentStep
   const { t } = useI18n();
 
   return (
-    <div className="mt-8 mb-2">
+    <div className="mt-6 sm:mt-8 mb-2 px-1">
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center">
           {STEP_KEYS.map((step, index) => {
@@ -33,7 +33,7 @@ const StepProgress: React.FC<StepProgressProps> = ({ completedSteps, currentStep
 
             return (
               <div key={step.key} className="flex items-center" style={{ flex: index < STEP_KEYS.length - 1 ? 1 : 'none' }}>
-                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+                <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center">
                   {/* Outer ping ring for active state */}
                   {isActive && (
                     <span className="absolute inset-0 rounded-full animate-ping bg-cyan-400/20" />
@@ -41,7 +41,7 @@ const StepProgress: React.FC<StepProgressProps> = ({ completedSteps, currentStep
 
                   {/* Node circle */}
                   <div
-                    className={`relative flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-500 ${
+                    className={`relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 transition-all duration-500 ${
                       isCompleted
                         ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-400'
                         : isActive
@@ -90,7 +90,7 @@ const StepProgress: React.FC<StepProgressProps> = ({ completedSteps, currentStep
                 </div>
 
                 {index < STEP_KEYS.length - 1 && (
-                  <div className="flex-1 mx-2 relative">
+                  <div className="flex-1 mx-1 sm:mx-2 relative">
                     <div className={`h-px w-full transition-colors duration-500 ${
                       isCompleted && nextCompleted
                         ? 'bg-emerald-400/40'
@@ -116,7 +116,7 @@ const StepProgress: React.FC<StepProgressProps> = ({ completedSteps, currentStep
             return (
               <div key={step.key} className="flex items-center" style={{ flex: index < STEP_KEYS.length - 1 ? 1 : 'none' }}>
                 <span
-                  className={`block w-10 text-center text-[10px] font-medium tracking-wide uppercase transition-colors whitespace-nowrap ${
+                  className={`block w-8 sm:w-10 text-center text-[9px] sm:text-[10px] font-medium tracking-wide uppercase transition-colors whitespace-nowrap ${
                     isCompleted
                       ? 'text-emerald-400/80'
                       : isActive
@@ -126,7 +126,7 @@ const StepProgress: React.FC<StepProgressProps> = ({ completedSteps, currentStep
                 >
                   {t.steps[step.tKey]}
                 </span>
-                {index < STEP_KEYS.length - 1 && <div className="flex-1 mx-2" />}
+                {index < STEP_KEYS.length - 1 && <div className="flex-1 mx-1 sm:mx-2" />}
               </div>
             );
           })}

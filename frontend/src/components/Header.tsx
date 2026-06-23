@@ -20,10 +20,10 @@ const Header: React.FC<HeaderProps> = ({ apiConnected }) => {
 
   return (
     <header className="glass-strong border-b border-cyan-500/15">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg font-bold text-sm text-cyan-300 overflow-hidden"
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+        <div className="flex h-14 sm:h-16 items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="relative flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg font-bold text-xs sm:text-sm text-cyan-300 overflow-hidden"
               style={{
                 background: 'linear-gradient(135deg, rgba(6,182,212,0.2), rgba(59,130,246,0.2))',
                 boxShadow: '0 0 15px rgba(6,182,212,0.2), inset 0 0 15px rgba(6,182,212,0.1)',
@@ -33,20 +33,20 @@ const Header: React.FC<HeaderProps> = ({ apiConnected }) => {
               <span className="relative z-10 glow-text">AI</span>
               <div className="absolute inset-0 bg-linear-to-br from-cyan-500/10 to-blue-500/10" />
             </div>
-            <div>
-              <h1 className="text-lg font-semibold text-white leading-tight tracking-tight">
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-lg font-semibold text-white leading-tight tracking-tight truncate">
                 {t.header.title}
               </h1>
-              <p className="text-xs text-slate-400 leading-tight">
+              <p className="hidden sm:block text-xs text-slate-400 leading-tight truncate">
                 {t.header.subtitle}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <button
               onClick={toggleLocale}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/50 bg-slate-800/50 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/30 hover:text-cyan-300 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/50 bg-slate-800/50 px-2 sm:px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/30 hover:text-cyan-300 transition-all"
               title={locale === 'en' ? 'Switch to Chinese' : '切换到英文'}
             >
               <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,7 +55,10 @@ const Header: React.FC<HeaderProps> = ({ apiConnected }) => {
               {locale === 'en' ? '中文' : 'EN'}
             </button>
 
-            <div className="flex items-center gap-2 text-sm">
+            <div
+              className="flex items-center gap-2 text-sm"
+              title={apiConnected ? t.header.apiConnected : t.header.apiOffline}
+            >
               <span className="relative flex h-2 w-2">
                 {apiConnected && (
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
@@ -64,7 +67,7 @@ const Header: React.FC<HeaderProps> = ({ apiConnected }) => {
                   apiConnected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.6)]'
                 }`} />
               </span>
-              <span className="text-xs text-slate-400">
+              <span className="hidden sm:inline text-xs text-slate-400">
                 {apiConnected ? t.header.apiConnected : t.header.apiOffline}
               </span>
             </div>

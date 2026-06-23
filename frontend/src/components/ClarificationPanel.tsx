@@ -217,7 +217,7 @@ const ClarificationPanel: React.FC<ClarificationPanelProps> = ({
         animation: 'slideUp 0.3s ease',
       }}
     >
-      <div className="px-5 py-4 border-b border-cyan-500/10" style={{ background: 'rgba(6,182,212,0.03)' }}>
+      <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-cyan-500/10" style={{ background: 'rgba(6,182,212,0.03)' }}>
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-full"
             style={{
@@ -237,7 +237,7 @@ const ClarificationPanel: React.FC<ClarificationPanelProps> = ({
         </div>
       </div>
 
-      <div className="px-5 py-4 space-y-5">
+      <div className="px-3 sm:px-5 py-4 space-y-5">
         {event.questions.map((question, idx) => (
           <div key={question.id}>
             <div className="flex items-start gap-2 mb-2.5">
@@ -251,7 +251,7 @@ const ClarificationPanel: React.FC<ClarificationPanelProps> = ({
               </span>
               <p className="text-sm font-medium text-slate-300">{question.text}</p>
             </div>
-            <div className="ml-7">
+            <div className="ml-0 sm:ml-7">
               <QuestionField
                 question={question}
                 value={answers[question.id] ?? (question.type === 'choice' && question.allow_multiple ? [] : '')}
@@ -262,7 +262,7 @@ const ClarificationPanel: React.FC<ClarificationPanelProps> = ({
         ))}
       </div>
 
-      <div className="px-5 py-3 border-t border-cyan-500/10 flex items-center justify-between" style={{ background: 'rgba(6,182,212,0.03)' }}>
+      <div className="px-3 sm:px-5 py-3 border-t border-cyan-500/10 flex flex-wrap items-center justify-between gap-2" style={{ background: 'rgba(6,182,212,0.03)' }}>
         <span className="text-xs text-slate-600 font-mono">
           {answeredCount}/{event.questions.length} {t.clarification.answered}
         </span>

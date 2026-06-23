@@ -345,7 +345,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-surface-secondary grid-bg">
       <Header apiConnected={apiConnected} />
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* ── Restored session banner ───────────────────────────────────── */}
         {restoredSession && !isStreaming && (
           <div className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3"
@@ -382,7 +382,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="glass rounded-xl p-6 glow-border">
+        <div className="glass rounded-xl p-4 sm:p-6 glow-border">
           <RequirementForm onSubmit={handleSubmit} isLoading={isStreaming} />
         </div>
 
@@ -436,7 +436,7 @@ const App: React.FC = () => {
             )}
 
             {result && (
-              <div className="glass rounded-xl glow-border p-5">
+              <div className="glass rounded-xl glow-border p-3 sm:p-5">
                 <SummaryPanel result={result} />
                 {newTaskCount != null && newTaskCount > 0 && (
                   <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
@@ -451,8 +451,8 @@ const App: React.FC = () => {
 
             <div className="glass rounded-xl glow-border overflow-hidden">
               {!isStreaming && result && (
-                <div className="border-b border-slate-700/50 px-4 flex items-center justify-between">
-                  <nav className="flex gap-6">
+                <div className="border-b border-slate-700/50 px-3 sm:px-4 flex items-center justify-between gap-2">
+                  <nav className="flex gap-4 sm:gap-6">
                     {([
                       { key: 'table', label: 'Task List' },
                       { key: 'gantt', label: 'Timeline' },
@@ -474,7 +474,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              <div className="p-4">
+              <div className="p-3 sm:p-4">
                 {hasTasks && (activeTab === 'table' || isStreaming) && (
                   <TaskTable tasks={displayTasks} isStreaming={isStreaming} processingTaskId={processingTaskId} />
                 )}

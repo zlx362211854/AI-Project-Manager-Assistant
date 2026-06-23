@@ -140,7 +140,132 @@ const TaskTable: React.FC<TaskTableProps> = ({ tasks, isStreaming = false, proce
   };
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    {/* ── Mobile card view (below md) ───────────────────────────── */}
+    <div className="md:hidden space-y-2.5">
+      {tasks.map((task, index) => {
+        const isExpanded = expandedIds.has(task.id);
+        const hasDetails = task.description || task.user_story || task.acceptance_criteria?.length > 0 || task.technical_notes;
+        const pStyle = PRIORITY_STYLES[task.priority];
+        const isFlashing = flashIds.has(task.id);
+        const isProcessing = processingTaskId === task.id;
+
+        return (
+          <div
+            key={task.id}
+            className={`rounded-lg border border-slate-700/40 bg-slate-800/30 p-3 transition-all ${hasDetails ? 'cursor-pointer active:bg-slate-700/40' : ''} ${isFlashing ? 'task-flash' : ''} ${isProcessing ? 'task-scanning' : ''}`}
+            style={{ animation: `fadeIn 0.3s ease ${index * 50}ms both` }}
+            onClick={() => hasDetails && toggleExpand(task.id)}
+          >
+            <div className="flex items-start gap-2">
+              <span className="text-slate-600 font-mono text-[11px] mt-0.5 shrink-0">
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-1.5">
+                  {isProcessing && (
+                    <span className="relative flex h-2 w-2 mt-1.5 shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-60" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+                    </span>
+                  )}
+                  {!isProcessing && hasDetails && (
+                    <svg
+                      className={`h-3.5 w-3.5 text-cyan-500/40 shrink-0 mt-1 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
+                  <span className={`font-medium text-sm leading-snug ${isProcessing ? 'text-cyan-300' : 'text-slate-200'}`}>
+                    {task.title}
+                  </span>
+                </div>
+
+                {!isExpanded && task.description && !task.pending_answers && (
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">{task.description}</p>
+                )}
+
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {prioritiesReady || !isStreaming ? (
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${pStyle.bg} ${pStyle.text} ${pStyle.glow}`}>
+                      {task.priority}
+                    </span>
+                  ) : (
+                    <Skeleton width="w-12" />
+                  )}
+                  <span className="text-cyan-300/70 font-mono text-[11px]">{Math.round(task.estimated_time)}h</span>
+                  {(allocationReady || !isStreaming) && task.assignee && (
+                    <span className="inline-flex items-center rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                      {task.assignee.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                  {(allocationReady || !isStreaming) && task.start_date && task.end_date && (
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {task.start_date} ~ {task.end_date}
+                    </span>
+                  )}
+                </div>
+
+                {task.pending_answers && (
+                  <div className="mt-2 rounded-md border border-cyan-500/30 bg-cyan-950/40 px-2.5 py-2 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-cyan-400/80 uppercase tracking-wider">
+                      <span className="relative flex h-1.5 w-1.5 shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-60" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                      </span>
+                      {t.table.yourAnswers}
+                    </div>
+                    {Object.values(task.pending_answers).map((ans, i) => (
+                      <div key={i} className="text-xs text-slate-300 leading-relaxed pl-2 border-l border-cyan-500/20">
+                        {Array.isArray(ans) ? ans.join(', ') : ans}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isExpanded && hasDetails && (
+                  <div className="mt-3 space-y-3 border-l border-cyan-500/20 pl-2.5">
+                    {task.description && (
+                      <DetailSection label={t.table.description} icon="M4 6h16M4 12h16M4 18h12">
+                        {task.description}
+                      </DetailSection>
+                    )}
+                    {task.user_story && (
+                      <DetailSection label={t.table.userStory} icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
+                        <span className="italic text-slate-400/80">{task.user_story}</span>
+                      </DetailSection>
+                    )}
+                    {task.acceptance_criteria && task.acceptance_criteria.length > 0 && (
+                      <DetailSection label={t.table.acceptanceCriteria} icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z">
+                        <ul className="space-y-0.5">
+                          {task.acceptance_criteria.map((ac, i) => (
+                            <li key={i} className="flex items-start gap-1.5">
+                              <span className="text-cyan-500/50 mt-0.5 shrink-0">&#x2022;</span>
+                              <span>{ac}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </DetailSection>
+                    )}
+                    {task.technical_notes && (
+                      <DetailSection label={t.table.technicalNotes} icon="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4">
+                        <span className="font-mono text-[11px] bg-slate-700/60 text-emerald-300/80 px-2 py-1 rounded border border-slate-600/40 break-all">
+                          {task.technical_notes}
+                        </span>
+                      </DetailSection>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* ── Desktop table view (md and up) ─────────────────────────── */}
+    <div className="hidden md:block overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-600/40">
@@ -310,6 +435,7 @@ const TaskTable: React.FC<TaskTableProps> = ({ tasks, isStreaming = false, proce
         </tbody>
       </table>
     </div>
+    </>
   );
 };
 

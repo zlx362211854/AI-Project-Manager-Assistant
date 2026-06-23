@@ -63,11 +63,11 @@ const GanttChart: React.FC<GanttChartProps> = ({ tasks }) => {
         const style = getBarStyle(task.start_date!, task.end_date!);
         const pColor = PRIORITY_COLORS[task.priority];
         return (
-          <div key={task.id} className="flex items-center gap-3">
-            <div className="w-32 shrink-0 text-xs text-slate-400 truncate text-right font-mono">
+          <div key={task.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+            <div className="w-full sm:w-32 sm:shrink-0 text-xs text-slate-400 truncate sm:text-right font-mono">
               {task.title}
             </div>
-            <div className="relative flex-1 h-7 bg-slate-700/40 rounded border border-slate-600/30 overflow-hidden">
+            <div className="relative w-full sm:flex-1 h-6 sm:h-7 bg-slate-700/40 rounded border border-slate-600/30 overflow-hidden">
               <div
                 className={`absolute top-0.5 bottom-0.5 rounded ${pColor.bg} transition-all`}
                 style={{ ...style, boxShadow: pColor.glow }}
